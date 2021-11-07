@@ -6,12 +6,14 @@ import { Program, Provider, web3 } from '@project-serum/anchor';
 import idl from './idl.json';
 import twitterLogo from './assets/twitter-logo.svg';
 import './App.css';
+import kp from './keypair.json';
 
 // SystemProgram is a reference to the Solana runtime!
 const { SystemProgram, Keypair } = web3;
 
-// Create a keypair for the account that will hold the GIF data.
-let baseAccount = Keypair.generate();
+const arr = Object.values(kp._keypair.secretKey);
+const secret = new Uint8Array(arr);
+const baseAccount = Keypair.fromSecretKey(secret);
 
 // Get our program's id form the IDL file.
 const programID = new PublicKey(idl.metadata.address);
@@ -114,11 +116,31 @@ const App = () => {
     }
   };
 
-  const handleSubmit = async () => {
+  const sendGif = async () => {
     if (inputValue.length > 0) {
       console.log('Gif link:', inputValue);
     } else {
       console.log('Empty input. Try again.');
+    }
+    if (inputValue.length === 0) {
+      console.log('No gif link given');
+      return;
+    }
+    console.log('Gif link:', inputValue);
+    try {
+      const provider = getProvider();
+      const program = new Program(idl, programID, provider);
+
+      await program.rpc.addGif(inputValue, {
+        accounts: {
+          baseAccount: baseAccount.publicKey,
+        },
+      });
+      console.log('GIF sent to program successfully', inputValue);
+
+      await getGifList();
+    } catch (e) {
+      console.log('Error sending GIF', e);
     }
   };
 
@@ -142,7 +164,7 @@ const App = () => {
             value={inputValue}
             onChange={onInputChange}
           />
-          <button className="cta-button submit-gif-button" onClick={handleSubmit}>
+          <button className="cta-button submit-gif-button" onClick={sendGif}>
             Submit
           </button>
           <div className="gif-grid">
@@ -164,6 +186,15 @@ const App = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (walletAddress) {
+      console.log('Fetching GIF list...');
+
+      // Call Solana program here
+      getGifList();
+    }
+  }, [walletAddress]);
+
   const getGifList = async () => {
     try {
       const provider = getProvider();
@@ -177,15 +208,6 @@ const App = () => {
       setGifList(null);
     }
   };
-
-  useEffect(() => {
-    if (walletAddress) {
-      console.log('Fetching GIF list...');
-
-      // Call Solana program here
-      getGifList();
-    }
-  }, [walletAddress]);
 
   return (
     <div className="App">
